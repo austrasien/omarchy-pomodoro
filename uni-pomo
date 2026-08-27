@@ -1,0 +1,80 @@
+#!/bin/bash
+# uni-pomo — control the Pomodoro plugin (techywilbur.pomodoro) in the Omarchy shell.
+# The engine is ~/.config/omarchy/plugins/techywilbur.pomodoro (Service.qml);
+# settings live inline on its entry in ~/.config/omarchy/shell.json.
+#
+#   uni-pomo                     short human status
+#   uni-pomo status [--json]     status (JSON with --json)
+#   uni-pomo start               start (idle/ready) or resume (paused)
+#   uni-pomo toggle              start / pause / resume
+#   uni-pomo pause | resume
+#   uni-pomo stop                stop and reset the set
+#   uni-pomo skip                skip the current block
+#   uni-pomo focus [min]         start a focus block (default from settings)
+#   uni-pomo break [min]         start a short break
+#   uni-pomo long [min]          start a long break
+#   uni-pomo extend <min>        add (or subtract) minutes on the running block
+#   uni-pomo hide | show         hide / show the break screen
+#   uni-pomo panel               toggle the bar popup
+#   uni-pomo get <key>           read a setting
+#   uni-pomo set <key> <value>   write a setting (focus, shortBreak, longBreak,
+#                                longEvery, dnd, overlay, sound, notify,
+#                                autoStartBreak, autoStartFocus, overlayDim, presets)
+#   uni-pomo settings            print all settings
+
+set -euo pipefail
+CFG="$HOME/.config/omarchy/shell.json"
+ID="techywilbur.pomodoro"
+
+ipc() { omarchy-shell pomodoro "$@"; }
+
+entry_path() {
+  # jq path to this plugin's entry, wherever it sits
+  jq -r --arg id "$ID" '. as $root
+    | [paths(objects) | . as $p | select(($root | getpath($p)) | .id? == $id)] | first // empty | @json' "$CFG"
+}
+
+get_setting() {
+  local p; p=$(entry_path)
+  [[ -n $p ]] || { echo "plugin entry not found in $CFG" >&2; exit 1; }
+  jq -r --argjson p "$p" --arg k "$1" 'getpath($p)[$k] // empty' "$CFG"
+}
+
+set_setting() {
+  local p tmp val=$2
+  p=$(entry_path)
+  [[ -n $p ]] || { echo "plugin entry not found in $CFG" >&2; exit 1; }
+  # numbers, booleans and JSON arrays pass through; anything else is a string
+  if ! jq -e --argjson v "$val" 'true' >/dev/null 2>&1 <<<'null'; then val=$(jq -Rn --arg v "$val" '$v'); fi
+  tmp=$(mktemp "$(dirname "$CFG")/.shell.json.XXXXXX")
+  jq --argjson p "$p" --arg k "$1" --argjson v "$val" 'setpath($p + [$k]; $v)' "$CFG" >"$tmp" && mv "$tmp" "$CFG"
+  echo "$1 = $val"
+}
+
+human() {
+  local json=$1
+  jq -r '
+    def mins: (.todayMinutes|tostring) + " min";
+    if .phase == "idle" then "Pomodoro idle · today " + (.todayCount|tostring) + " sessions, " + mins
+    elif .phase == "ready" then .label + " — waiting to start " + .readyNext
+    else .label + (if .paused then " (paused)" else "" end) + " · " + .remaining + " left · " + (.cyclesDone|tostring) + "/" + (.longEvery|tostring) + " this set" end' <<<"$json"
+}
+
+case "${1:-status}" in
+status)
+  json=$(ipc status) || { echo "shell not answering" >&2; exit 1; }
+  if [[ ${2:-} == "--json" || ${2:-} == "-j" ]]; then echo "$json"; else human "$json"; fi ;;
+start|toggle|pause|resume|stop|skip) human "$(ipc "$1")" ;;
+focus) human "$(ipc focus "${2:-0}")" ;;
+break|short) human "$(ipc shortBreak "${2:-0}")" ;;
+long) human "$(ipc longBreak "${2:-0}")" ;;
+extend) [[ -n ${2:-} ]] || { echo "usage: uni-pomo extend <minutes>" >&2; exit 1; }; human "$(ipc extend "$2")" ;;
+hide) ipc hideBreak >/dev/null ;;
+show) ipc showBreak >/dev/null ;;
+panel) omarchy-shell shell toggle "$ID" ;;
+get) get_setting "${2:?key}" ;;
+set) set_setting "${2:?key}" "${3:?value}" ;;
+settings) p=$(entry_path); [[ -n $p ]] && jq --argjson p "$p" 'getpath($p)' "$CFG" ;;
+-h|--help|help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//' ;;
+*) echo "unknown command: $1 (try uni-pomo help)" >&2; exit 1 ;;
+esac

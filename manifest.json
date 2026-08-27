@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "techywilbur.pomodoro",
+  "name": "Pomodoro",
+  "version": "1.1.0",
+  "author": "Wilbur Lindqvist (techywilbur)",
+  "license": "MIT",
+  "description": "Pomodoro focus timer for the Omarchy bar: a countdown in the bar, a popup with transport controls, focus presets and break buttons, a full-screen break screen with a progress ring, Do Not Disturb while you focus, chimes, notifications and daily stats. Survives shell restarts and suspend.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Pomodoro",
+    "description": "Focus timer with a break screen and DND during focus",
+    "category": "Time",
+    "defaultSection": "center",
+    "allowMultiple": false,
+    "defaults": {
+      "focus": 25,
+      "shortBreak": 5,
+      "longBreak": 15,
+      "longEvery": 4,
+      "dnd": true,
+      "overlay": true,
+      "sound": true,
+      "notify": true,
+      "autoStartBreak": true,
+      "autoStartFocus": false,
+      "staleAfter": 30
+    },
+    "schema": [
+      { "key": "focus", "type": "integer", "label": "Focus block (minutes)", "min": 1, "max": 180, "step": 5, "defaultValue": 25 },
+      { "key": "shortBreak", "type": "integer", "label": "Short break (minutes)", "min": 1, "max": 60, "step": 1, "defaultValue": 5 },
+      { "key": "longBreak", "type": "integer", "label": "Long break (minutes)", "min": 1, "max": 120, "step": 5, "defaultValue": 15 },
+      { "key": "longEvery", "type": "integer", "label": "Long break after every N focus blocks", "min": 0, "max": 12, "step": 1, "defaultValue": 4, "description": "0 disables long breaks and the session dots." },
+      { "key": "dnd", "type": "boolean", "label": "Silence notifications while focusing", "defaultValue": true, "description": "Turns on Do Not Disturb for the length of a focus block and restores the previous state afterwards." },
+      { "key": "overlay", "type": "boolean", "label": "Full-screen break screen", "defaultValue": true, "description": "Cover every monitor with a break screen during breaks. Esc hides it, Space skips the break." },
+      { "key": "sound", "type": "boolean", "label": "Chime at the end of a block", "defaultValue": true },
+      { "key": "notify", "type": "boolean", "label": "Desktop notification at the end of a block", "defaultValue": true },
+      { "key": "autoStartBreak", "type": "boolean", "label": "Start the break automatically when focus ends", "defaultValue": true },
+      { "key": "autoStartFocus", "type": "boolean", "label": "Start the next focus automatically when a break ends", "defaultValue": false, "description": "Off: wait for you to press Start (or Enter on the break screen)." },
+      { "key": "staleAfter", "type": "integer", "label": "Drop a restored timer if it ended more than N minutes ago", "min": 1, "max": 1440, "step": 5, "defaultValue": 30 }
+    ]
+  }
+}

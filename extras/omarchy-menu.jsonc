@@ -1,0 +1,16 @@
+  // Pomodoro plugin (techywilbur.pomodoro) — needs the uni-pomo CLI in ~/.local/bin.
+  "pomodoro": {"icon":"󰔛","label":"Pomodoro","aliases":["pomo","focus"],"description":"Focus timer — 25/5/15"},
+  "pomodoro.toggle": {"icon":"󰐊","label":"Start / Pause","description":"Start a focus block, or pause and resume the running one","action":"$HOME/.local/bin/uni-pomo toggle"},
+  "pomodoro.skip": {"icon":"󰒭","label":"Skip Block","description":"Jump to the break, or end the break early","when":"[[ \"$($HOME/.local/bin/uni-pomo status --json | jq -r .phase)\" != idle ]]","action":"$HOME/.local/bin/uni-pomo skip"},
+  "pomodoro.stop": {"icon":"󰓛","label":"Stop","description":"Stop the timer and reset the set","when":"[[ \"$($HOME/.local/bin/uni-pomo status --json | jq -r .phase)\" != idle ]]","action":"$HOME/.local/bin/uni-pomo stop"},
+  "pomodoro.focus": {"icon":"󰧐","label":"Focus","description":"Start a focus block of a given length"},
+  "pomodoro.focus.15": {"icon":"󰧐","label":"15 min","action":"$HOME/.local/bin/uni-pomo focus 15"},
+  "pomodoro.focus.25": {"icon":"󰧐","label":"25 min","action":"$HOME/.local/bin/uni-pomo focus 25"},
+  "pomodoro.focus.50": {"icon":"󰧐","label":"50 min","action":"$HOME/.local/bin/uni-pomo focus 50"},
+  "pomodoro.focus.90": {"icon":"󰧐","label":"90 min","action":"$HOME/.local/bin/uni-pomo focus 90"},
+  "pomodoro.break": {"icon":"󰅶","label":"Break","description":"Start a break now"},
+  "pomodoro.break.short": {"icon":"󰅶","label":"Short break","action":"$HOME/.local/bin/uni-pomo break"},
+  "pomodoro.break.long": {"icon":"󰅶","label":"Long break","action":"$HOME/.local/bin/uni-pomo long"},
+  "pomodoro.panel": {"icon":"","label":"Open Panel","description":"Open the pomodoro popup in the bar","action":"$HOME/.local/bin/uni-pomo panel"},
+  "pomodoro.dnd": {"icon":"󰂛","label":"Silence While Focusing","checked":"[[ \"$($HOME/.local/bin/uni-pomo get dnd)\" != false ]]","action":"bash -c 'v=$($HOME/.local/bin/uni-pomo get dnd); [[ $v == false ]] && $HOME/.local/bin/uni-pomo set dnd true || $HOME/.local/bin/uni-pomo set dnd false'"},
+  "pomodoro.overlay": {"icon":"󱄄","label":"Break Screen","checked":"[[ \"$($HOME/.local/bin/uni-pomo get overlay)\" != false ]]","action":"bash -c 'v=$($HOME/.local/bin/uni-pomo get overlay); [[ $v == false ]] && $HOME/.local/bin/uni-pomo set overlay true || $HOME/.local/bin/uni-pomo set overlay false'"}
