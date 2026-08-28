@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Bounded, non-following reader for ~/.local/state/uni-pomo/state.json.
+
+The shell keeps this plugin loaded for the whole session, so it must never
+block or balloon on whatever happens to sit at that predictable path. This
+helper therefore:
+
+  1. opens the state directory with O_DIRECTORY|O_NOFOLLOW and checks the open
+     descriptor is a directory owned by the current user;
+  2. opens state.json relative to that descriptor with
+     O_NOFOLLOW|O_NONBLOCK|O_NOCTTY (a symlink or FIFO cannot be followed or
+     block us);
+  3. fstat()s the already-open descriptor: it must be a regular file owned by
+     the current user and at most MAX_BYTES long, and the read is capped at
+     MAX_BYTES regardless of what fstat said;
+  4. parses the JSON and prints only a whitelisted, type- and range-checked
+     object to stdout.
+
+Anything else prints nothing (exit 0 = no state, exit 2 = rejected), and the
+engine starts fresh. Standard library only; python is a hard dependency of
+Omarchy (via uwsm).
+"""
+
+import json
+import os
+import re
+import stat
+import sys
+
+MAX_BYTES = 16 * 1024
+STATE_DIR = os.path.join(os.path.expanduser("~"), ".local", "state", "uni-pomo")
+STATE_FILE = "state.json"
+
+DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+MS_MAX = 7 * 24 * 60 * 60 * 1000          # a block can't be longer than a week
+EPOCH_MS_MAX = 2 ** 53                    # anything above is not a real timestamp
+
+
+def reject(reason):
+    print("pomo-state-read: " + reason, file=sys.stderr)
+    return 2
+
+
+def read_capped():
+    """Return the file bytes, None if there is no usable state, or an int exit code."""
+    uid = os.getuid()
+    try:
+        dfd = os.open(STATE_DIR, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        return reject("state dir: %s" % e.strerror)
+    try:
+        st = os.fstat(dfd)
+        if not stat.S_ISDIR(st.st_mode) or st.st_uid != uid:
+            return reject("state dir is not a user-owned directory")
+        try:
+            fd = os.open(STATE_FILE,
+                         os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY | os.O_CLOEXEC,
+                         dir_fd=dfd)
+        except FileNotFoundError:
+            return None
+        except OSError as e:
+            return reject("state file: %s" % e.strerror)
+    finally:
+        os.close(dfd)
+
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return reject("state file is not a regular file")
+        if st.st_uid != uid:
+            return reject("state file is not owned by the current user")
+        if st.st_size > MAX_BYTES:
+            return reject("state file exceeds %d bytes" % MAX_BYTES)
+        buf = b""
+        while len(buf) <= MAX_BYTES:
+            try:
+                chunk = os.read(fd, MAX_BYTES + 1 - len(buf))
+            except BlockingIOError:
+                return reject("state file would block")
+            if not chunk:
+                break
+            buf += chunk
+        if len(buf) > MAX_BYTES:
+            return reject("state file grew past %d bytes" % MAX_BYTES)
+        return buf
+    except OSError as e:
+        return reject("read: %s" % e.strerror)
+    finally:
+        os.close(fd)
+
+
+def as_int(v, lo, hi):
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    if v != v or v in (float("inf"), float("-inf")):
+        return None
+    v = int(v)
+    return v if lo <= v <= hi else None
+
+
+def as_bool(v):
+    return v if isinstance(v, bool) else None
+
+
+def as_enum(v, allowed):
+    return v if isinstance(v, str) and v in allowed else None
+
+
+def sanitize(raw):
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    if as_int(data.get("version"), 1, 1) is None:
+        return None
+
+    fields = {
+        "phase": as_enum(data.get("phase"), ("idle", "focus", "short", "long", "ready")),
+        "readyNext": as_enum(data.get("readyNext"), ("focus", "break")),
+        "running": as_bool(data.get("running")),
+        "endsAt": as_int(data.get("endsAt"), 0, EPOCH_MS_MAX),
+        "remainingMs": as_int(data.get("remainingMs"), 0, MS_MAX),
+        "plannedMs": as_int(data.get("plannedMs"), 0, MS_MAX),
+        "cyclesDone": as_int(data.get("cyclesDone"), 0, 1000),
+        "day": data.get("day") if isinstance(data.get("day"), str)
+               and DAY_RE.match(data.get("day")) else None,
+        "todayCount": as_int(data.get("todayCount"), 0, 10000),
+        "todayMinutes": as_int(data.get("todayMinutes"), 0, 1000000),
+        "dndBefore": as_bool(data.get("dndBefore")),
+        "dndApplied": as_bool(data.get("dndApplied")),
+        "tipIndex": as_int(data.get("tipIndex"), 0, 1000000),
+    }
+    out = {"version": 1}
+    for key, value in fields.items():
+        if value is not None:
+            out[key] = value
+    return out
+
+
+def main():
+    result = read_capped()
+    if result is None:
+        return 0
+    if isinstance(result, int):
+        return result
+    state = sanitize(result)
+    if state is None:
+        return reject("state file is not a valid state object")
+    sys.stdout.write(json.dumps(state, separators=(",", ":")))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

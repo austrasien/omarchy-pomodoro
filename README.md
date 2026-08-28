@@ -58,6 +58,8 @@ hairline under the label while a block runs.
 - `pipewire` (`pw-play`) or `pulseaudio` (`paplay`) for the chime, and the
   freedesktop sound theme (`/usr/share/sounds/freedesktop`) — all standard on
   Omarchy. Set `sound` to `false` if you have neither.
+- `python3` (standard library only) for the bundled state reader — a hard
+  dependency of Omarchy itself, so nothing extra to install.
 - Optional, for the CLI: `jq` (standard on Omarchy).
 
 No sudo or pkexec is required.
@@ -175,7 +177,14 @@ omarchy-shell shell toggle techywilbur.pomodoro   # open / close the popup
   label and the popup. `PomoModel.js` is the pure logic.
 - Time is stored as a wall-clock end, so a block keeps counting correctly
   through suspend and shell restarts. State is written to
-  `~/.local/state/uni-pomo/state.json` on every transition.
+  `~/.local/state/uni-pomo/state.json` on every transition (atomically, via a
+  temp file and rename). It is read back only through the bundled
+  `pomo-state-read` helper, which opens the directory and file with
+  `O_NOFOLLOW` (the file also `O_NONBLOCK`), checks the *open* descriptor is a
+  regular file owned by you and at most 16 KiB, caps the read, and hands the
+  shell a whitelisted, range-checked object. A planted FIFO, symlink or
+  oversized file cannot block or bloat the shell at startup; the timer just
+  starts fresh.
 - Do Not Disturb goes through the shell's own notifications service; the state
   you had before the focus block is restored when it ends.
 - The chime is played with `pw-play` (falling back to `paplay`); notifications
@@ -192,6 +201,7 @@ manifest.json        plugin manifest (kinds: service + bar-widget, settings sche
 Service.qml          engine, persistence, DND, break screen; IPC target `pomodoro`
 BarWidget.qml        bar label + popup; IPC target `techywilbur.pomodoro`
 PomoModel.js         pure logic: settings parsing, phases, formatting
+pomo-state-read      bounded, non-following state reader (python3, stdlib only)
 uni-pomo             optional bash CLI
 extras/bindings.lua  optional Hyprland keybinds
 extras/omarchy-menu.jsonc  optional Omarchy menu entries

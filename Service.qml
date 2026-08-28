@@ -13,7 +13,9 @@ import "PomoModel.js" as Pomo
 // Time is kept as an absolute wall-clock end (`endsAt`) so the countdown
 // survives suspend, shell restarts and theme switches: state is persisted to
 // ~/.local/state/uni-pomo/state.json on every transition and rehydrated on
-// load. Configuration is read live from this plugin's entry in shell.json.
+// load through the bundled `pomo-state-read` helper (bounded, O_NOFOLLOW,
+// fstat-validated, whitelisted). Configuration is read live from this
+// plugin's entry in shell.json.
 //
 // IPC: `omarchy-shell pomodoro <status|start|pause|resume|toggle|stop|skip|
 //        focus <min>|shortBreak <min>|longBreak <min>|extend <min>|hideBreak|showBreak>`
@@ -27,6 +29,12 @@ Item {
   readonly property string pluginId: "techywilbur.pomodoro"
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/uni-pomo"
   readonly property string statePath: stateDir + "/state.json"
+
+  // The shell stamps the plugin folder into manifest.__sourceDir; the state
+  // reader ships next to this file.
+  readonly property string sourceDir: manifest && manifest.__sourceDir
+    ? String(manifest.__sourceDir).replace(/^file:\/\//, "").replace(/\/$/, "") : ""
+  readonly property string stateReaderPath: sourceDir ? sourceDir + "/pomo-state-read" : ""
 
   // ---- configuration (inline on the widget's bar entry; hot-reloaded by the shell)
   readonly property var entry: Pomo.findEntry(shell ? shell.shellConfig : null, pluginId)
@@ -326,19 +334,50 @@ Item {
     persist()
   }
 
+  // Write-only. The shell never reads the raw state path itself: `preload`
+  // is off so this FileView only ever writes, and it writes atomically
+  // (temp file + rename), so a symlink planted at the path is replaced, not
+  // followed.
   FileView {
     id: stateFile
     path: root.statePath
+    preload: false
     watchChanges: false
     atomicWrites: true
     printErrors: false
-    onLoaded: root.hydrate(text())
-    onLoadFailed: root.hydrate("")
+  }
+
+  // Reading goes through the bundled `pomo-state-read` helper instead of a
+  // FileView on the predictable path: it opens the directory and the file
+  // with O_NOFOLLOW (the file also O_NONBLOCK), fstat()s the already-open
+  // descriptor (must be a regular file owned by us, at most 16 KiB), caps the
+  // read, and prints only a whitelisted, range-checked object. A planted FIFO,
+  // symlink or oversized file therefore cannot block or bloat the shell at
+  // startup; the engine just starts fresh.
+  Process {
+    id: stateReader
+    command: ["python3", root.stateReaderPath]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.hydrate(text)
+    }
+  }
+
+  // If the helper could not run at all (no python, missing file), still
+  // start the engine rather than sitting unhydrated forever.
+  Timer {
+    id: hydrateFallback
+    interval: 5000
+    onTriggered: root.hydrate("")
   }
 
   Component.onCompleted: {
     Quickshell.execDetached(["mkdir", "-p", root.stateDir])
-    Qt.callLater(function() { stateFile.reload() })
+    hydrateFallback.start()
+    Qt.callLater(function() {
+      if (root.stateReaderPath) stateReader.running = true
+      else root.hydrate("")
+    })
   }
 
   Timer {

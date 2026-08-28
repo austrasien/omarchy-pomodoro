@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "techywilbur.pomodoro",
   "name": "Pomodoro",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "Wilbur Lindqvist (techywilbur)",
   "license": "MIT",
   "description": "Pomodoro focus timer for the Omarchy bar: a countdown in the bar, a popup with transport controls, focus presets and break buttons, a full-screen break screen with a progress ring, Do Not Disturb while you focus, chimes, notifications and daily stats. Survives shell restarts and suspend.",
