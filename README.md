@@ -133,7 +133,7 @@ Optional `uni-pomo` CLI and extras live in the repo (`uni-pomo`, `extras/binding
 
 ## ⚖️ License
 
-Licensed under the **MIT License**. Upstream © 2026 Wilbur Lindqvist; this fork adds the cloned-bar bridge and docs.
+Licensed under the **MIT License** (upstream [techywilbur/omarchy-pomodoro](https://github.com/techywilbur/omarchy-pomodoro)).
 
 ---
 *Forked so Pomodoro still opens when your Omarchy bar is a clone — not only on stock `omarchy.bar`.*
