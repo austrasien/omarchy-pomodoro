@@ -166,3 +166,19 @@ function sessionDots(cyclesDone, longEvery, phase) {
   }
   return dots
 }
+
+// Shared live engine handle. Omarchy 4.0+ gives cloned bars a sandboxed
+// shell facade whose serviceFor() only resolves the bar's own id, so the
+// bar widget cannot reach this plugin's Service via bar.shell.serviceFor.
+// Service registers itself here (.pragma library => one instance); the
+// widget falls back to getEngine() when the shell lookup returns null.
+var _engine = null
+
+function setEngine(engine) {
+  _engine = engine || null
+}
+
+function getEngine() {
+  return _engine
+}
+

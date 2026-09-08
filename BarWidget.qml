@@ -16,9 +16,33 @@ BarWidget {
   id: root
   moduleName: "techywilbur.pomodoro"
 
-  readonly property var pomo: bar && bar.shell && typeof bar.shell.serviceFor === "function"
-    ? bar.shell.serviceFor("techywilbur.pomodoro") : null
+  // Prefer the shell service lookup (works on the first-party bar). Fall
+  // back to the shared PomoModel engine handle when running under a cloned
+  // bar whose sandboxed shell facade cannot resolve this plugin's service.
+  property var pomo: null
   readonly property bool ready: pomo !== null && pomo !== undefined
+
+  function resolvePomo() {
+    var viaShell = bar && bar.shell && typeof bar.shell.serviceFor === "function"
+      ? bar.shell.serviceFor("techywilbur.pomodoro") : null
+    if (viaShell) {
+      pomo = viaShell
+      return
+    }
+    var viaBridge = Pomo.getEngine()
+    if (viaBridge) pomo = viaBridge
+  }
+
+  Timer {
+    interval: 250
+    running: root.pomo === null
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: root.resolvePomo()
+  }
+
+  Component.onCompleted: root.resolvePomo()
+  onBarChanged: root.resolvePomo()
   readonly property string phase: ready ? pomo.phase : "idle"
   readonly property bool active: ready ? pomo.active : false
   readonly property bool running: ready ? pomo.running : false

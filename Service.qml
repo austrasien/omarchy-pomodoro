@@ -372,12 +372,17 @@ Item {
   }
 
   Component.onCompleted: {
+    Pomo.setEngine(root)
     Quickshell.execDetached(["mkdir", "-p", root.stateDir])
     hydrateFallback.start()
     Qt.callLater(function() {
       if (root.stateReaderPath) stateReader.running = true
       else root.hydrate("")
     })
+  }
+
+  Component.onDestruction: {
+    if (Pomo.getEngine() === root) Pomo.setEngine(null)
   }
 
   Timer {

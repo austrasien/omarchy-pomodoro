@@ -1,5 +1,21 @@
 # Pomodoro — focus timer for the Omarchy bar
 
+> **Fork:** [austrasien/omarchy-pomodoro](https://github.com/austrasien/omarchy-pomodoro)
+> of [techywilbur/omarchy-pomodoro](https://github.com/techywilbur/omarchy-pomodoro).
+>
+> This fork keeps upstream behaviour and adds a fix so the bar widget still
+> finds its engine when Omarchy runs a **cloned bar** (e.g. `austraz.bar`).
+> On Omarchy 4.0.3+, a cloned bar gets a sandboxed shell facade whose
+> `serviceFor()` only resolves the bar's own id — so
+> `bar.shell.serviceFor("techywilbur.pomodoro")` returns `null`, the widget
+> thinks it is not ready, and **clicks do nothing**. Upstream is fine on the
+> stock `omarchy.bar`.
+>
+> **Fix in this fork:** `Service.qml` registers the live engine in the shared
+> `PomoModel.js` library (`.pragma library`). `BarWidget.qml` still prefers
+> `bar.shell.serviceFor(...)`, and falls back to that shared handle when the
+> sandboxed lookup fails. Harmless on the first-party bar.
+
 A pomodoro timer for the [Omarchy](https://omarchy.org) shell. A countdown sits
 in the bar next to the clock, a click opens the controls, and every break takes
 over the screen with a progress ring so you actually step away. Notifications
@@ -67,7 +83,7 @@ No sudo or pkexec is required.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/techywilbur/omarchy-pomodoro.git --enable
+omarchy plugin add https://github.com/austrasien/omarchy-pomodoro.git --enable
 ```
 
 `--enable` places the widget in the bar's center section (you can choose a
@@ -76,6 +92,21 @@ section when prompted). To add it later, or move it next to the clock:
 ```bash
 omarchy plugin enable techywilbur.pomodoro
 omarchy bar move techywilbur.pomodoro --section center
+```
+
+## This fork
+
+Upstream: [techywilbur/omarchy-pomodoro](https://github.com/techywilbur/omarchy-pomodoro).
+Plugin id stays `techywilbur.pomodoro` so an existing bar entry keeps working.
+
+If you already installed upstream, point the plugin remote at this fork (or
+remove and re-add):
+
+```bash
+cd ~/.config/omarchy/plugins/techywilbur.pomodoro
+git remote set-url origin https://github.com/austrasien/omarchy-pomodoro.git
+git pull
+omarchy restart shell
 ```
 
 ## Update
